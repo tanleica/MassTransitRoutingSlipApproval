@@ -8,19 +8,15 @@ var services = new ServiceCollection();
 Console.WriteLine("Registering MassTransit...");
 services.AddMassTransit(x =>
 {
-    // This is required even when using Rider (for internal bus setup)
+
     x.UsingInMemory((context, cfg) => { });
 
-    // Rider block for Kafka
     x.AddRider(rider =>
     {
+
         Console.WriteLine("➡️ Registering Rider Activities");
 
-        // Automatically scan and register all activities in your namespace
-        // rider.AddActivitiesFromNamespaceContaining<ManagerApprovalActivity>();
-        // rider.AddActivitiesFromNamespaceContaining<DirectorApprovalActivity>();
-        // rider.AddActivitiesFromNamespaceContaining<PushNotificationActivity>();
-
+        // ✅ Register activities
         rider.AddActivity<ManagerApprovalActivity, ApprovalArguments, ApprovalLog>();
         rider.AddActivity<DirectorApprovalActivity, ApprovalArguments, ApprovalLog>();
         rider.AddExecuteActivity<PushNotificationActivity, ApprovalArguments>();
@@ -29,44 +25,45 @@ services.AddMassTransit(x =>
         {
             kafka.Host("159.223.59.17:9092");
 
+            // ✅ Bind each topic to the correct ExecuteActivity
             kafka.TopicEndpoint<RoutingSlip>("manager-approval_execute", "manager-group", e =>
             {
-                Console.WriteLine("✅ Registered Kafka Endpoint: manager-approval_execute");
                 e.ExecuteActivityHost<ManagerApprovalActivity, ApprovalArguments>(context);
-            });
-
-            kafka.TopicEndpoint<RoutingSlip>("manager-approval_execute", "debug-group", e =>
-            {
-                e.Handler<RoutingSlip>(context =>
-                {
-                    Console.WriteLine($"[DEBUG] RoutingSlip received: {context.Message.TrackingNumber}");
-                    return Task.CompletedTask;
-                });
+                Console.WriteLine("✅ Ready: ManagerApprovalActivity");
             });
 
             kafka.TopicEndpoint<RoutingSlip>("director-approval_execute", "director-group", e =>
             {
-                Console.WriteLine("✅ Registered Kafka Endpoint: director-approval_execute");
                 e.ExecuteActivityHost<DirectorApprovalActivity, ApprovalArguments>(context);
+                Console.WriteLine("✅ Ready: DirectorApprovalActivity");
             });
 
-            kafka.TopicEndpoint<RoutingSlip>("push-notification_execute", "notify-group", e =>
+            kafka.TopicEndpoint<RoutingSlip>("push-notification_execute", "push-group", e =>
             {
-                Console.WriteLine("✅ Registered Kafka Endpoint: push-notification_execute");
                 e.ExecuteActivityHost<PushNotificationActivity, ApprovalArguments>(context);
+                Console.WriteLine("✅ Ready: PushNotificationActivity");
             });
         });
-
-
     });
 });
 Console.WriteLine("✅ MassTransit Registration Done");
 
 var provider = services.BuildServiceProvider();
+Console.WriteLine(" [✔] Check point 1");
 
-// ✅ Start MassTransit (Bus + Rider)
+// ✅ Start the bus
 var bus = provider.GetRequiredService<IBusControl>();
-await bus.StartAsync();
+Console.WriteLine(" [✔] Check point 2");
 
-Console.WriteLine(" [✔] RoutingSlipWorker is running...");
-await Task.Delay(-1); // Keep the app running
+try
+{
+    await bus.StartAsync();
+    Console.WriteLine(" [✔] RoutingSlipWorker is running...");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"❌ Worker failed to start: {ex.Message}");
+}
+
+Console.WriteLine(" [✔] Check point 3");
+await Task.Delay(-1); // Keep the worker running
