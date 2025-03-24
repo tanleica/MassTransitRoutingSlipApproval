@@ -1,0 +1,18 @@
+services:
+  # ✅ RoutingSlipWorker Service
+  worker:
+    image: routingslip-worker
+    container_name: routingslip_worker
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+
+  # ✅ RoutingSlipExecutor Service
+  executor:
+    image: routingslip-executor
+    container_name: routingslip_executor
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile.executor

@@ -1,0 +1,30 @@
+# ✅ Build Stage
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build-stage
+
+WORKDIR /src
+
+# ✅ Copy only the required project file
+COPY RoutingSlipWorker/RoutingSlipWorker.csproj RoutingSlipWorker/RoutingSlipWorker.csproj
+COPY Shared/Shared.csproj Shared/Shared.csproj
+
+# ✅ Restore dependencies
+RUN dotnet restore RoutingSlipWorker/RoutingSlipWorker.csproj --verbosity minimal
+
+# ✅ Copy all source files
+COPY RoutingSlipWorker/. RoutingSlipWorker/.
+COPY Shared/. Shared/.
+
+# ✅ Build and publish
+RUN dotnet build RoutingSlipWorker/RoutingSlipWorker.csproj -c Release --no-restore
+RUN dotnet publish RoutingSlipWorker/RoutingSlipWorker.csproj -c Release -o /app/publish --no-build
+
+# ✅ Runtime Stage
+FROM mcr.microsoft.com/dotnet/runtime:9.0 AS runtime
+
+WORKDIR /app
+
+# ✅ Copy the published files
+COPY --from=build-stage /app/publish ./
+
+# ✅ Run the Scheduler
+ENTRYPOINT ["dotnet", "RoutingSlipWorker.dll"]
